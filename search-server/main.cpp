@@ -6,10 +6,12 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <numeric>
 
 using namespace std;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
+const double MAX_DIFFERENCE = 1e-6;
 
 string ReadLine() {
     string s;
@@ -79,12 +81,10 @@ public:
 
         sort(matched_documents.begin(), matched_documents.end(),
             [](const Document& lhs, const Document& rhs) {
-                if (abs(lhs.relevance - rhs.relevance) < 1e-6) {
+                if (abs(lhs.relevance - rhs.relevance) < MAX_DIFFERENCE) {
                     return lhs.rating > rhs.rating;
                 }
-                else {
-                    return lhs.relevance > rhs.relevance;
-                }
+        return lhs.relevance > rhs.relevance;
             });
         if (matched_documents.size() > MAX_RESULT_DOCUMENT_COUNT) {
             matched_documents.resize(MAX_RESULT_DOCUMENT_COUNT);
@@ -94,24 +94,8 @@ public:
 
     //Версия поиска документов с одним аргументом
     vector<Document> FindTopDocuments(const string& raw_query, DocumentStatus status_ = DocumentStatus::ACTUAL) const {
-        if (status_ == DocumentStatus::ACTUAL) {
-            return FindTopDocuments(raw_query, [](int document_id, DocumentStatus status, int rating)
-                { return status == DocumentStatus::ACTUAL; });
-        }
-        else if (status_ == DocumentStatus::BANNED) {
-            return FindTopDocuments(raw_query, [](int document_id, DocumentStatus status, int rating)
-                { return status == DocumentStatus::BANNED; });
-        }
-        else if (status_ == DocumentStatus::IRRELEVANT) {
-            return FindTopDocuments(raw_query, [](int document_id, DocumentStatus status, int rating)
-                { return status == DocumentStatus::IRRELEVANT; });
-        }
-        else {
-            return FindTopDocuments(raw_query, [](int document_id, DocumentStatus status, int rating)
-                { return status == DocumentStatus::REMOVED; });
-        }
-        //если не была передана лямбда функция, то передаем в основной FindTopDocuments лямбда-функцию с
-        //статусом == ACTUAL, который при проверке в FindAllDocuments выдаст только актуальные документы
+        return FindTopDocuments(raw_query, [status_](int document_id, DocumentStatus status, int rating)
+            { return status == status_; });
     }
 
 
@@ -167,11 +151,7 @@ private:
     }
 
     static int ComputeAverageRating(const vector<int>& ratings) {
-        int rating_sum = 0;
-        for (const int rating : ratings) {
-            rating_sum += rating;
-        }
-        return rating_sum / static_cast<int>(ratings.size());
+        return accumulate(ratings.begin(), ratings.end(), 0) / static_cast<int>(ratings.size());
     }
 
     struct QueryWord {
@@ -220,7 +200,8 @@ private:
 
     template <typename Extra_Fun>
     bool SortBy(const int& id, const Extra_Fun& extra_fun) const {
-        if (extra_fun(id, documents_.at(id).status, documents_.at(id).rating)) {
+        const auto& needed_doc = documents_.at(id);
+        if (extra_fun(id, needed_doc.status, needed_doc.rating)) {
             return true;
         }
         return false;
@@ -262,6 +243,8 @@ private:
         }
         return matched_documents;
     }
+
+
 };
 
 void PrintDocument(const Document& document) {
