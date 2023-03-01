@@ -282,6 +282,25 @@ void AssertImpl(bool value, const string& expr_str, const string& file, const st
 
 #define ASSERT_HINT(expr, hint) AssertImpl(!!(expr), #expr, __FILE__, __FUNCTION__, __LINE__, (hint))
 
+void TestAddDocs() {
+    const int doc_id = 1;
+    const string content = "cat city"s;
+    const vector<int> ratings = { 1, 2, 3 };
+    const int doc_id_2 = 2;
+    const string content_2 = "cat village"s;
+    const vector<int> ratings_2 = { 1, 1, 1 };
+
+    SearchServer server;
+    server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
+    const auto& rel = server.FindTopDocuments("cat"s);
+    ASSERT_EQUAL(rel[0].id, doc_id);
+    ASSERT(rel.size() == 1);
+    server.AddDocument(doc_id_2, content, DocumentStatus::ACTUAL, ratings);
+    const auto& rel_2 = server.FindTopDocuments("cat"s);
+    ASSERT_EQUAL(rel_2[1].id, doc_id_2);
+    ASSERT(rel_2.size() == 2);
+}
+
 void TestExcludeStopWordsFromAddedDocumentContent() {
     const int doc_id = 42;
     const string content = "cat in the city"s;
@@ -329,15 +348,15 @@ void TestMatch() {
     ASSERT(matched_words == real_matched_words);
 }
 
-void TestRelRait() {
+void TestRelevance() { //раздалить на два теста
     const int doc_id = 1;
-    const string content = "small cat"s;
+    const string content = "small cat"s; //1
     const vector<int> ratings = { 1, 2, 3 };
     const int doc_id_2 = 2;
-    const string content_2 = "big dog"s;
+    const string content_2 = "big dog"s; //2
     const vector<int> ratings_2 = { 5, 20, 5 };
     const int doc_id_3 = 3;
-    const string content_3 = "small cat dog"s;
+    const string content_3 = "small cat dog"s; //0
     const vector<int> ratings_3 = { 2, 4, 3 };
 
     SearchServer server;
@@ -346,10 +365,53 @@ void TestRelRait() {
     server.AddDocument(doc_id_3, content_3, DocumentStatus::ACTUAL, ratings_3);
     const auto& rel = server.FindTopDocuments("cat dog small");
     ASSERT(rel[0].id == 3 && rel[1].id == 1 && rel[2].id == 2);
-    ASSERT(rel[0].rating == 3 && rel[1].rating == 2 && rel[2].rating == 10);
+    if (abs(rel[0].relevance - rel[1].relevance) < MAX_DIFFERENCE) {
+        ASSERT(rel[0].rating > rel[1].rating);
+    }
+    else {
+        ASSERT(rel[0].relevance > rel[1].relevance);
+    }
+    if (abs(rel[1].relevance - rel[2].relevance) < MAX_DIFFERENCE) {
+        ASSERT(rel[1].rating > rel[2].rating);
+    }
+    else {
+        ASSERT(rel[1].relevance > rel[2].relevance);
+    }
 }
 
-void TestPredicatandStatus() {
+void TestRating() {
+    const int doc_id = 1;
+    const string content = "cat"s;
+    const vector<int> ratings = { 5, 4, 5 }; //4
+    const int doc_id_2 = 2;
+    const string content_2 = "dog"s;
+    const vector<int> ratings_2 = { -5, -20, -5 }; //-10
+    const int doc_id_3 = 3;
+    const string content_3 = "bobr"s;
+    const vector<int> ratings_3 = { 1, -4, 10 }; //2
+    const int doc_id_4 = 4;
+    const string content_4 = "goose"s;
+    const vector<int> ratings_4 = { 1, -10, 2 }; //-2
+
+    SearchServer server;
+    server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
+    server.AddDocument(doc_id_2, content_2, DocumentStatus::ACTUAL, ratings_2);
+    server.AddDocument(doc_id_3, content_3, DocumentStatus::ACTUAL, ratings_3);
+    server.AddDocument(doc_id_4, content_4, DocumentStatus::ACTUAL, ratings_4);
+    const auto& rait_1 = server.FindTopDocuments("cat");
+    ASSERT_EQUAL_HINT(rait_1[0].rating, 4, "POSITIVE RATING ERROR"s);
+
+    const auto& rait_2 = server.FindTopDocuments("dog");
+    ASSERT_EQUAL_HINT(rait_2[0].rating, -10, "NEGATIVE RATING ERROR"s);
+
+    const auto& rait_3 = server.FindTopDocuments("bobr");
+    ASSERT_EQUAL_HINT(rait_3[0].rating, 2, "POSITIVE-NEGATIVE RATING ERROR"s);
+
+    const auto& rait_4 = server.FindTopDocuments("goose");
+    ASSERT_EQUAL_HINT(rait_4[0].rating, -2, "NEGATIVE-POSITIVE RATING ERROR"s);
+}
+
+void TestPredicat() {
     const int doc_id = 1;
     const string content = "small cat"s;
     const vector<int> ratings = { 1, 2, 3 };
@@ -360,16 +422,38 @@ void TestPredicatandStatus() {
     SearchServer server;
     server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
     server.AddDocument(doc_id_2, content_2, DocumentStatus::BANNED, ratings_2);
-    {
-        const auto& rel = server.FindTopDocuments("cat dog small", [](int document_id, DocumentStatus status, int rating) {
-            return status == DocumentStatus::BANNED;
-            });
-        ASSERT(rel[0].id == 2);
-    }
-    {
-        const auto& rel = server.FindTopDocuments("cat dog small", DocumentStatus::BANNED);
-        ASSERT(rel[0].id == 2);
-    }
+    const auto& rel = server.FindTopDocuments("cat dog small", [](int document_id, DocumentStatus status, int rating) {
+        return status == DocumentStatus::BANNED; });
+    ASSERT(rel[0].id == 2 && rel.size() == 1);
+    const auto& rel_2 = server.FindTopDocuments("cat dog small", [](int document_id, DocumentStatus status, int rating) {
+        return document_id > 3; });
+    ASSERT(rel_2.empty());
+    const auto& rel_3 = server.FindTopDocuments("cat dog small", [](int document_id, DocumentStatus status, int rating) {
+        return rating == 2; });
+    ASSERT(rel_3[0].id == 1 && rel_3.size() == 1);
+}
+
+void TestStatus() {
+    const int doc_id = 1;
+    const string content = "small cat"s;
+    const vector<int> ratings = { 1, 2, 3 };
+    const int doc_id_2 = 2;
+    const int doc_id_3 = 3;
+    const int doc_id_4 = 4;
+
+    SearchServer server;
+    server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
+    server.AddDocument(doc_id_2, content, DocumentStatus::BANNED, ratings);
+    server.AddDocument(doc_id_3, content, DocumentStatus::IRRELEVANT, ratings);
+    server.AddDocument(doc_id_4, content, DocumentStatus::REMOVED, ratings);
+    const auto& rel = server.FindTopDocuments("cat small", DocumentStatus::ACTUAL);
+    ASSERT(rel[0].id == 1 && rel.size() == 1);
+    const auto& rel_2 = server.FindTopDocuments("cat small", DocumentStatus::BANNED);
+    ASSERT(rel_2[0].id == 2 && rel_2.size() == 1);
+    const auto& rel_3 = server.FindTopDocuments("cat small", DocumentStatus::IRRELEVANT);
+    ASSERT(rel_3[0].id == 3 && rel_3.size() == 1);
+    const auto& rel_4 = server.FindTopDocuments("cat small", DocumentStatus::REMOVED);
+    ASSERT(rel_4[0].id == 4 && rel_4.size() == 1);
 }
 
 void TestRelCalc() {
@@ -384,17 +468,21 @@ void TestRelCalc() {
     server.AddDocument(doc_id, content, DocumentStatus::ACTUAL, ratings);
     server.AddDocument(doc_id_2, content_2, DocumentStatus::ACTUAL, ratings_2);
     const auto& rel_calc = server.FindTopDocuments("cat dog small");
-    ASSERT((rel_calc[0].relevance - 0.693147) < MAX_DIFFERENCE);
+    ASSERT(abs(rel_calc[0].relevance - 0.693147) < MAX_DIFFERENCE);
+    ASSERT(abs(rel_calc[1].relevance - 0.346574) < MAX_DIFFERENCE);
 }
 
 #define RUN_TEST(Function) Function()
 
 void TestSearchServer() {
+    RUN_TEST(TestAddDocs);
     RUN_TEST(TestExcludeStopWordsFromAddedDocumentContent);
     RUN_TEST(TestMinusWords);
     RUN_TEST(TestMatch);
-    RUN_TEST(TestRelRait);
-    RUN_TEST(TestPredicatandStatus);
+    RUN_TEST(TestRelevance);
+    RUN_TEST(TestRating);
+    RUN_TEST(TestPredicat);
+    RUN_TEST(TestStatus);
     RUN_TEST(TestRelCalc);
 }
 
@@ -433,3 +521,4 @@ int main() {
     }
     return 0;
 }
+
