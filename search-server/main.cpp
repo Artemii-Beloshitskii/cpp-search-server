@@ -100,9 +100,9 @@ public:
 
     int GetDocumentId(int index)
     {
-        if (index < 0 || index > GetDocumentCount())
+        if (index < 0 || checking_doc_index.at(index))
         {
-            throw out_of_range("Index is negative or bigger then number of docs"s);
+            throw out_of_range("Index is negative or there is now such document"s);
         }
         return index;
     }
@@ -120,7 +120,7 @@ public:
             throw invalid_argument("Wrong symbols in document"s);
         }
 
-
+        checking_doc_index.push_back(document_id);
         vector<string> words = SplitIntoWordsNoStop(document);
 
         const double inv_word_count = 1.0 / words.size();
@@ -132,15 +132,8 @@ public:
 
     template <typename DocumentPredicate>
     vector<Document> FindTopDocuments(const string& raw_query, DocumentPredicate document_predicate) const {
-        if (!IsValidWord(raw_query)) {
-            throw invalid_argument("Wrong symbols in raw_query"s);
-        }
 
-        Query query;
-        bool troubles = !ParseQuery(raw_query, query);
-        if (troubles) {
-            throw invalid_argument("Troubles with minus sign"s);
-        }
+        Query query = ParseQuery(raw_query);
 
         vector<Document> result = FindAllDocuments(query, document_predicate);
         sort(result.begin(), result.end(),
@@ -148,9 +141,7 @@ public:
                 if (abs(lhs.relevance - rhs.relevance) < MAX_DIFFERENCE) {
                     return lhs.rating > rhs.rating;
                 }
-                else {
-                    return lhs.relevance > rhs.relevance;
-                }
+        return lhs.relevance > rhs.relevance;
             });
         if (result.size() > MAX_RESULT_DOCUMENT_COUNT) {
             result.resize(MAX_RESULT_DOCUMENT_COUNT);
@@ -173,15 +164,8 @@ public:
     }
 
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query, int document_id) const {
-        if (!IsValidWord(raw_query)) {
-            throw invalid_argument("Wrong symbols in raw_query"s);
-        }
 
-        Query query;
-        bool troubles = !ParseQuery(raw_query, query);
-        if (troubles) {
-            throw invalid_argument("Troubles with minus sign"s);
-        }
+        Query query = ParseQuery(raw_query);
 
         vector<string> matched_words;
         for (const string& word : query.plus_words) {
@@ -214,6 +198,7 @@ private:
     const set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
     map<int, DocumentData> documents_;
+    vector<int> checking_doc_index;
 
     static bool IsValidWord(const string& word) {
         return none_of(word.begin(), word.end(), [](char c) {
@@ -251,19 +236,24 @@ private:
         bool is_stop;
     };
 
-    bool ParseQueryWord(string text, QueryWord& query_word) const {
+    QueryWord ParseQueryWord(string text) const {
+
+        QueryWord query_word;
+
         query_word.is_minus = false;
         if (!text.empty() && text[0] == '-') {
             text = text.substr(1);
 
-            if (text[0] == '-' || text.empty()) { return false; }
+            if (text[0] == '-' || text.empty()) {
+                throw invalid_argument("Troubles with minus sign"s);
+            }
 
             query_word.is_minus = true;
         }
         query_word.data = text;
         query_word.is_stop = IsStopWord(text);
 
-        return true;
+        return query_word;
     }
 
     struct Query {
@@ -271,12 +261,15 @@ private:
         set<string> minus_words;
     };
 
-    bool ParseQuery(const string& text, Query& query) const {
-        for (const string& word : SplitIntoWords(text)) {
-            QueryWord query_word;
-            bool troubles = !ParseQueryWord(word, query_word);
+    Query ParseQuery(const string& text) const {
+        if (!IsValidWord(text)) {
+            throw invalid_argument("Wrong symbols in raw_query"s);
+        }
 
-            if (troubles) { return false; }
+        Query query;
+        for (const string& word : SplitIntoWords(text)) {
+
+            QueryWord query_word = ParseQueryWord(word);
 
             if (!query_word.is_stop) {
                 if (query_word.is_minus) {
@@ -287,7 +280,7 @@ private:
                 }
             }
         }
-        return true;
+        return query;
     }
 
     double ComputeWordInverseDocumentFreq(const string& word) const {
@@ -336,5 +329,5 @@ void PrintDocument(const Document& document) {
         << "rating = "s << document.rating << " }"s << endl;
 }
 int main() {
-    SearchServer search_server("и в на"s);
+    SearchServer search_server("and is which"s);
 }
