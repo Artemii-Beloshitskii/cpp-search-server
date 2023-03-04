@@ -100,11 +100,17 @@ public:
 
     int GetDocumentId(int index)
     {
-        if (index < 0 || checking_doc_index.at(index))
+        /*
+        if (index < 0)
         {
-            throw out_of_range("Index is negative or there is now such document"s);
+            throw out_of_range("Index is negative"s);
         }
-        return index;
+        int max_index = static_cast<int>(document_id_at_index.size()) - 1;
+        if (index > max_index) {
+            throw out_of_range("Index is too big"s);
+        }
+        */
+        return document_id_at_index.at(index);
     }
 
     void AddDocument(int document_id, const string& document, DocumentStatus status,
@@ -120,7 +126,7 @@ public:
             throw invalid_argument("Wrong symbols in document"s);
         }
 
-        checking_doc_index.push_back(document_id);
+        document_id_at_index.push_back(document_id);
         vector<string> words = SplitIntoWordsNoStop(document);
 
         const double inv_word_count = 1.0 / words.size();
@@ -198,7 +204,7 @@ private:
     const set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
     map<int, DocumentData> documents_;
-    vector<int> checking_doc_index;
+    vector<int> document_id_at_index;
 
     static bool IsValidWord(const string& word) {
         return none_of(word.begin(), word.end(), [](char c) {
@@ -330,4 +336,10 @@ void PrintDocument(const Document& document) {
 }
 int main() {
     SearchServer search_server("and is which"s);
+    search_server.AddDocument(101, "cat"s, DocumentStatus::ACTUAL, { 1, 2 });
+    search_server.AddDocument(2, "dog"s, DocumentStatus::ACTUAL, { 1, 2 });
+    search_server.AddDocument(30, "hamster"s, DocumentStatus::ACTUAL, { 1, 2 });
+    cout << search_server.GetDocumentId(0) << endl;
+    cout << search_server.GetDocumentId(1) << endl;
+    cout << search_server.GetDocumentId(2) << endl;
 }
