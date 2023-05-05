@@ -17,11 +17,11 @@ void SearchServer::AddDocument(int document_id, const std::string& document,
 	const double inv_word_count = 1.0 / words.size();
 	for (const std::string& word : words) {
 		word_to_document_freqs_[word][document_id] += inv_word_count;
-		word_frequencies[document_id][word] += inv_word_count;
+		word_frequencies_[document_id][word] += inv_word_count;
 	}
 	documents_.emplace(document_id, DocumentData{ ComputeAverageRating(ratings), status });
 
-	document_ids_.push_back(document_id);
+	document_ids_.insert(document_id);
 }
 
 std::vector<Document> SearchServer::FindTopDocuments(const std::string& raw_query, DocumentStatus status) const
@@ -42,20 +42,20 @@ int SearchServer::GetDocumentCount() const
 	return documents_.size();
 }
 
-typename std::vector<int>::const_iterator SearchServer::begin() const
+typename std::set<int>::const_iterator SearchServer::begin() const
 {
 	return SearchServer::document_ids_.begin();
 }
 
-typename std::vector<int>::const_iterator SearchServer::end() const
+typename std::set<int>::const_iterator SearchServer::end() const
 {
 	return SearchServer::document_ids_.end();
 }
 
 const std::map<std::string, double>& SearchServer::GetWordFrequencies(int document_id) const
 {
-	if (word_frequencies.count(document_id) != 0) {
-		return word_frequencies.at(document_id);
+	if (word_frequencies_.count(document_id) != 0) {
+		return word_frequencies_.at(document_id);
 	}
 	else {
 		static const std::map<std::string, double> empty;
@@ -65,15 +65,15 @@ const std::map<std::string, double>& SearchServer::GetWordFrequencies(int docume
 
 void SearchServer::RemoveDocument(int document_id)
 {
-	if (word_frequencies.count(document_id) != 0) {
+	if (word_frequencies_.count(document_id) != 0) {
 
-		for (auto word_to_delete : word_frequencies.at(document_id)) {
+		for (auto word_to_delete : word_frequencies_.at(document_id)) {
 			word_to_document_freqs_.erase(word_to_delete.first);
 		}
 
-		document_ids_.erase(find(begin(), end(), document_id));
+		document_ids_.erase(document_id);
 		documents_.erase(document_id);
-		word_frequencies.erase(document_id);
+		word_frequencies_.erase(document_id);
 
 	}
 }

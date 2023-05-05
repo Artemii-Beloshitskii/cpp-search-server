@@ -21,7 +21,7 @@ void RemoveDuplicates(SearchServer& search_server)
         }
     }
 
-    for (const int& document_id : anti_duplicate_id) {
+    for (int document_id : anti_duplicate_id) {
         std::cout << "Found duplicate document id " << document_id << std::endl;
         search_server.RemoveDocument(document_id);
     }
