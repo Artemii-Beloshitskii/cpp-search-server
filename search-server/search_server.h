@@ -31,9 +31,15 @@ public:
 
     std::vector<Document> FindTopDocuments(const std::string& raw_query) const;
 
-    int GetDocumentCount() const;
+    int GetDocumentCount() const; 
 
-    int GetDocumentId(int index) const;
+    typename std::vector<int>::const_iterator begin() const;
+
+    typename std::vector<int>::const_iterator end() const;
+
+    const std::map<std::string, double>& GetWordFrequencies(int document_id) const;
+
+    void RemoveDocument(int document_id);
 
     std::tuple<std::vector<std::string>, DocumentStatus> MatchDocument(const std::string& raw_query,
         int document_id) const;
@@ -47,6 +53,7 @@ private:
     std::map<std::string, std::map<int, double>> word_to_document_freqs_;
     std::map<int, DocumentData> documents_;
     std::vector<int> document_ids_;
+    std::map<int, std::map<std::string, double>> word_frequencies;
 
     bool IsStopWord(const std::string& word) const;
 
@@ -80,7 +87,7 @@ private:
 
 template <typename StringContainer>
 SearchServer::SearchServer(const StringContainer& stop_words)
-    : stop_words_(MakeUniqueNonEmptyStrings(stop_words))  // Extract non-empty stop words
+    : stop_words_(MakeUniqueNonEmptyStrings(stop_words))
 {
     if (!all_of(stop_words_.begin(), stop_words_.end(), IsValidWord)) {
         throw std::invalid_argument("Some of stop words are invalid"s);
