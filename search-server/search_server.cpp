@@ -39,32 +39,6 @@ std::vector<Document> SearchServer::FindTopDocuments(std::string_view raw_query)
 	return FindTopDocuments(raw_query, DocumentStatus::ACTUAL);
 }
 
-std::vector<Document> SearchServer::FindTopDocuments(std::execution::sequenced_policy policy, std::string_view raw_query, DocumentStatus status) const
-{
-	return FindTopDocuments(
-		policy, raw_query, [status](int document_id, DocumentStatus document_status, int rating) {
-			return document_status == status;
-		});
-}
-
-std::vector<Document> SearchServer::FindTopDocuments(std::execution::sequenced_policy policy, std::string_view raw_query) const
-{
-	return FindTopDocuments(policy, raw_query, DocumentStatus::ACTUAL);
-}
-
-std::vector<Document> SearchServer::FindTopDocuments(std::execution::parallel_policy policy, std::string_view raw_query, DocumentStatus status) const
-{
-	return FindTopDocuments(
-		policy, raw_query, [status](int document_id, DocumentStatus document_status, int rating) {
-			return document_status == status;
-		});
-}
-
-std::vector<Document> SearchServer::FindTopDocuments(std::execution::parallel_policy policy, std::string_view raw_query) const
-{
-	return FindTopDocuments(policy, raw_query, DocumentStatus::ACTUAL);
-}
-
 int SearchServer::GetDocumentCount() const
 {
 	return documents_.size();
@@ -130,7 +104,7 @@ void SearchServer::RemoveDocument(const std::execution::sequenced_policy& s_p, i
 	RemoveDocument(document_id);
 }
 
-std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDocument(std::string_view raw_query, int document_id) const
+matched_documents SearchServer::MatchDocument(std::string_view raw_query, int document_id) const
 {
 	if (documents_.count(document_id) == 0) {
 		throw std::out_of_range("Nonexistent document id");
@@ -164,7 +138,7 @@ std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDoc
 	return { matched_words, documents_.at(document_id).status };
 }
 
-std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDocument(const std::execution::parallel_policy& p_p,
+matched_documents SearchServer::MatchDocument(const std::execution::parallel_policy& p_p,
 	std::string_view raw_query, int document_id) const {
 	if (documents_.count(document_id) == 0) {
 		throw std::out_of_range("Nonexistent document id");
@@ -192,7 +166,7 @@ std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDoc
 	return { matched_words, documents_.at(document_id).status };
 }
 
-std::tuple<std::vector<std::string_view>, DocumentStatus> SearchServer::MatchDocument(const std::execution::sequenced_policy& s_p, std::string_view raw_query, int document_id) const
+matched_documents SearchServer::MatchDocument(const std::execution::sequenced_policy& s_p, std::string_view raw_query, int document_id) const
 {
 	return MatchDocument(raw_query, document_id);
 }

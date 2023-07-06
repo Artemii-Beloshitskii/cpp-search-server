@@ -62,25 +62,3 @@ public:
 private:
     std::vector<Bucket> buckets_;
 };
-
-template <typename Container, typename Function>
-void ForEach(std::execution::parallel_policy policy, Container& container, Function function) {
-    static constexpr int PART_COUNT = 4;
-    const auto part_length = size(container) / PART_COUNT;
-    auto part_begin = container.begin();
-    auto part_end = next(part_begin, part_length);
-
-    std::vector<std::future<void>> futures;
-    for (int i = 0;
-        i < PART_COUNT;
-        ++i,
-        part_begin = part_end,
-        part_end = (i == PART_COUNT - 1
-            ? container.end()
-            : next(part_begin, part_length))
-        ) {
-        futures.push_back(std::async([function, part_begin, part_end] {
-            for_each(part_begin, part_end, function);
-            }));
-    }
-}
