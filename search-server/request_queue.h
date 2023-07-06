@@ -1,4 +1,5 @@
 #pragma once
+
 #include <queue>
 #include "search_server.h"
 
